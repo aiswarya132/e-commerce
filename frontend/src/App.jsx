@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 const API_BASE = "http://localhost:5000/api";
+const ROLES = ["ADMIN", "VENDOR", "CUSTOMER"];
 
 async function apiCall(path, method = "GET", body, token = "") {
   try {
@@ -52,17 +53,29 @@ export default function App() {
   }, [currentUser]);
 
   const role = currentUser?.role;
+  const isProductList =
+    Array.isArray(output) &&
+    output.length > 0 &&
+    output.every((item) => typeof item === "object" && item !== null && "name" in item);
+
+  function setApiOutput(result) {
+    if (Array.isArray(result.data)) {
+      setOutput(result.data);
+      return;
+    }
+    setOutput({ status: result.status, ...result.data });
+  }
 
   async function handleRegister(e) {
     e.preventDefault();
     const result = await apiCall("/auth/register", "POST", regForm);
-    setOutput({ status: result.status, ...result.data });
+    setApiOutput(result);
   }
 
   async function handleLogin(e) {
     e.preventDefault();
     const result = await apiCall("/auth/login", "POST", loginForm);
-    setOutput({ status: result.status, ...result.data });
+    setApiOutput(result);
     if (result.data?.token) {
       setToken(result.data.token);
       setCurrentUser(result.data.user);
@@ -71,7 +84,7 @@ export default function App() {
 
   async function runAction(path, method = "GET", body) {
     const result = await apiCall(path, method, body, token);
-    setOutput({ status: result.status, ...result.data });
+    setApiOutput(result);
   }
 
   function logout() {
@@ -103,14 +116,19 @@ export default function App() {
             value={regForm.password}
             onChange={(e) => setRegForm((p) => ({ ...p, password: e.target.value }))}
           />
-          <select
-            value={regForm.role}
-            onChange={(e) => setRegForm((p) => ({ ...p, role: e.target.value }))}
-          >
-            <option value="CUSTOMER">Customer</option>
-            <option value="VENDOR">Vendor</option>
-            <option value="ADMIN">Admin</option>
-          </select>
+          <div className="role-picker">
+            {ROLES.map((roleOption) => (
+              <button
+                key={roleOption}
+                type="button"
+                className={`role-chip ${regForm.role === roleOption ? "active" : ""}`}
+                onClick={() => setRegForm((p) => ({ ...p, role: roleOption }))}
+              >
+                {roleOption}
+              </button>
+            ))}
+          </div>
+          <p className="selected-role">Selected role: {regForm.role}</p>
           <button type="submit">Register</button>
         </form>
       </section>
@@ -179,7 +197,25 @@ export default function App() {
 
       <section className="card">
         <h2>Output</h2>
-        <pre>{JSON.stringify(output, null, 2)}</pre>
+        {isProductList ? (
+          <div className="product-grid">
+            {output.map((product) => (
+              <article className="product-card" key={product.id}>
+                <img
+                  className="product-image"
+                  src={product.image_url || "https://via.placeholder.com/280x180?text=No+Image"}
+                  alt={product.name}
+                />
+                <h3>{product.name}</h3>
+                <p>{product.description || "No description provided."}</p>
+                <p>Price: {product.price}</p>
+                {"vendor_name" in product && <p>Vendor: {product.vendor_name}</p>}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <pre>{JSON.stringify(output, null, 2)}</pre>
+        )}
       </section>
     </main>
   );
